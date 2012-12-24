@@ -333,7 +333,7 @@ void AVPlayer::stop()
         qDebug("stop d");
         demuxer_thread->stop();
         //wait for finish then we can safely set the vars, e.g. a/v decoders
-        if (!demuxer_thread->wait()) {
+        if (!demuxer_thread->wait(1000)) {
             qWarning("Timeout waiting for demux thread stopped. Terminate it.");
             demuxer_thread->terminate(); //Terminate() causes the wait condition destroyed without waking up
         }
