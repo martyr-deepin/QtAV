@@ -97,6 +97,7 @@ protected:
     friend class EventFilter;
     EventFilter *event_filter;
     VideoCapture *video_capture;
+    bool paused;
 protected:
     virtual void timerEvent(QTimerEvent *);
 };

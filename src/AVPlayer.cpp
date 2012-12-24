@@ -57,7 +57,7 @@ namespace QtAV {
 
 AVPlayer::AVPlayer(QObject *parent) :
 	QObject(parent),capture_dir("capture"),renderer(0),audio(0)
-  ,event_filter(0),video_capture(0)
+  ,event_filter(0),video_capture(0),paused(false)
 {
     qDebug("QtAV %s\nCopyright (C) 2012 Wang Bin <wbsecg1@gmail.com>"
            "\nDistributed under GPLv3 or later"
@@ -233,6 +233,7 @@ void AVPlayer::pause(bool p)
     audio_thread->pause(p);
     video_thread->pause(p);
     clock->pause(p);
+    paused = p;
 #if 0
     /*Pause output. all threads using those outputs will be paused. If a output is not paused
      *, then other players' avthread can use it.
@@ -324,6 +325,7 @@ void AVPlayer::stop()
             qWarning("Timeout waiting for audio thread stopped. Terminate it.");
             audio_thread->terminate();
         }
+        audio->pause(paused);
     }
     if (video_thread->isRunning()) {
         qDebug("stopv");
@@ -332,6 +334,7 @@ void AVPlayer::stop()
             qWarning("Timeout waiting for video thread stopped. Terminate it.");
             video_thread->terminate(); ///if time out
         }
+        renderer->pause(paused);
     }
 }
 //FIXME: If not playing, it will just play but not play one frame.

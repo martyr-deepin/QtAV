@@ -107,9 +107,10 @@ void AVThread::setDemuxEnded(bool ended)
 void AVThread::resetState()
 {
     DPTR_D(AVThread);
-    pause(false);
-    if (d.writer)
-        d.writer->pause(false); //stop waiting. Important when replay
+    //keep pause state when replaying
+    //pause(false);
+    //if (d.writer)
+    //    d.writer->pause(false); //stop waiting. Important when replay
     d.stop = false;
     d.demux_end = false;
     d.packets.setBlocking(true);
