@@ -27,8 +27,8 @@
 
 namespace QtAV {
 
-const double kSyncThreshold = 0.005; // 5 ms
-
+const qreal kSyncThreshold = 0.005; // 5 ms
+const qreal kDiffSecsMax = 1.618; //s
 class VideoThreadPrivate : public AVThreadPrivate
 {
 public:
@@ -103,32 +103,37 @@ void VideoThread::run()
         Packet pkt = d.packets.take(); //wait to dequeue
         //Compare to the clock
         if (pkt.pts <= 0 || pkt.data.isNull()) {
-            qDebug("Invalid pts or empty packet!");
+            qDebug("Invalid pts or empty packet! pts=%f", pkt.pts);
             continue;
         }
-        d.delay = pkt.pts  - d.clock->value();
+        qreal diff = pkt.pts  - d.clock->value();
         /*
          *after seeking forward, a packet may be the old, v packet may be
          *the new packet, then the d.delay is very large, omit it.
          *TODO: 1. how to choose the value
          * 2. use last delay when seeking
         */
-        if (qAbs(d.delay) < 2.718) {
-            if (d.delay > kSyncThreshold) { //Slow down
+        if (qAbs(diff) < kDiffSecsMax) {
+            if (diff > kSyncThreshold) { //Slow down
                 //d.delay_cond.wait(&d.mutex, d.delay*1000); //replay may fail. why?
                 //qDebug("~~~~~wating for %f msecs", d.delay*1000);
-                usleep(d.delay * 1000000);
+                d.delay = diff;
+                usleep(diff * 1000000);
             } else if (d.delay < -kSyncThreshold) { //Speed up. drop frame?
                 //continue;
             }
         } else { //when to drop off?
-            qDebug("delay %f/%f", d.delay, d.clock->value());
-            if (d.delay > 0) {
-                msleep(64);
-            } else {
+            //if (diff > 0) {
+                if (d.delay > kSyncThreshold)
+                    d.delay -= kSyncThreshold;
+                else if (d.delay <= 0.0)
+                    d.delay = kSyncThreshold;
+                qDebug("delay %f/%f", d.delay, d.clock->value());
+                msleep(d.delay);
+            //} else {
                 //audio packet not cleaned up?
-                continue;
-            }
+                //continue;
+            //}
         }
         d.clock->updateVideoPts(pkt.pts); //here?
         //DO NOT decode and convert if vo is not available or null!
