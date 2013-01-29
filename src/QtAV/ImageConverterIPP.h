@@ -1,5 +1,5 @@
 /******************************************************************************
-    QtAV:  Media play library based on Qt and FFmpeg
+    ImageConverterIPP: Image resizing & color model convertion using Intel IPP
     Copyright (C) 2012-2013 Wang Bin <wbsecg1@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
@@ -16,37 +16,22 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
-#ifndef QAV_DECODER_H
-#define QAV_DECODER_H
+#ifndef QTAV_IMAGECONVERTERIPP_H
+#define QTAV_IMAGECONVERTERIPP_H
 
-#include <QtAV/QtAV_Global.h>
-
-class QByteArray;
-struct AVCodecContext;
-struct AVFrame;
+#include <QtAV/ImageConverter.h>
 
 namespace QtAV {
 
-class AVDecoderPrivate;
-class Q_EXPORT AVDecoder
+class ImageConverterIPPPrivate;
+class Q_EXPORT ImageConverterIPP : public ImageConverter
 {
-    DPTR_DECLARE_PRIVATE(AVDecoder)
+    DPTR_DECLARE_PRIVATE(ImageConverterIPP)
 public:
-    AVDecoder();
-    virtual ~AVDecoder();
-    void flush();
-    void setCodecContext(AVCodecContext* codecCtx); //protected
-    AVCodecContext* codecContext() const;
-    /*not available if AVCodecContext == 0*/
-    bool isAvailable() const;
-    virtual bool decode(const QByteArray& encoded) = 0; //decode AVPacket?
-    QByteArray data() const; //decoded data
-
+    ImageConverterIPP();
+    virtual bool convert(const quint8 *const srcSlice[], const int srcStride[]);
 protected:
-    AVDecoder(AVDecoderPrivate& d);
-
-    DPTR_DECLARE(AVDecoder)
+    virtual bool prepareData(); //Allocate memory for out data
 };
-
 } //namespace QtAV
-#endif // QAV_DECODER_H
+#endif // QTAV_IMAGECONVERTERIPP_H

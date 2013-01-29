@@ -56,7 +56,7 @@ bool AVDemuxer::readFrame()
     int ret = av_read_frame(format_context, &packet); //0: ok, <0: error/end
 
     if (ret != 0) {
-        if (ret == AVERROR_EOF) { //end of file
+        if (ret == AVERROR_EOF) { //end of file. FIXME: why no eof if replaying by seek(0)?
             if (!eof) {
                 eof = true;
                 started_ = false;
@@ -64,6 +64,8 @@ bool AVDemuxer::readFrame()
                 emit finished();
             }
             return false; //frames after eof are eof frames
+        } else if (ret == AVERROR_INVALIDDATA) {
+            qWarning("AVERROR_INVALIDDATA");
         }
         qWarning("[AVDemuxer] error: %s", av_err2str(ret));
         return false;
@@ -202,15 +204,22 @@ void AVDemuxer::seek(qreal q)
         qWarning("[AVDemuxer] seek error: %s", av_err2str(ret));
         return;
     }
+    //replay
+    if (q == 0) {
+        qDebug("************seek to 0. started = false");
+        started_ = false;
+        v_codec_context->frame_number = 0; //TODO: why frame_number not changed after seek?
+    }
     if (master_clock) {
         master_clock->updateValue(qreal(t)/qreal(AV_TIME_BASE));
         master_clock->updateExternalClock(t/1000LL); //in msec. ignore usec part using t/1000
     }
     //calc pts
-    if (videoCodecContext())
-        avcodec_flush_buffers(videoCodecContext());
-    if (audioCodecContext())
-        avcodec_flush_buffers(audioCodecContext());
+    //use AVThread::flush() when reaching end
+    //if (videoCodecContext())
+    //    avcodec_flush_buffers(videoCodecContext());
+    //if (audioCodecContext())
+    //    avcodec_flush_buffers(audioCodecContext());
 }
 
 /*
@@ -316,7 +325,21 @@ bool AVDemuxer::loadFile(const QString &fileName)
         if (ret < 0) {
             qWarning("open video codec failed: %s", av_err2str(ret));
             _has_vedio = false;
+        } else {
+            if (vCodec->capabilities & CODEC_CAP_DR1)
+                v_codec_context->flags |= CODEC_FLAG_EMU_EDGE;
         }
+        //if (hurry_up) {
+// 					codec_ctx->skip_frame = AVDISCARD_NONREF;
+            //codec_ctx->skip_loop_filter = codec_ctx->skip_idct = AVDISCARD_ALL;
+            //codec_ctx->flags2 |= CODEC_FLAG2_FAST;
+        //}
+        //else {
+            /*codec_ctx->skip_frame =*/ v_codec_context->skip_loop_filter = v_codec_context->skip_idct = AVDISCARD_DEFAULT;
+            v_codec_context->flags2 &= ~CODEC_FLAG2_FAST;
+        //}
+            bool skipframes = false;
+            v_codec_context->skip_frame = skipframes ? AVDISCARD_NONREF : AVDISCARD_DEFAULT;
     }
     started_ = false;
     return _has_audio || _has_vedio;
@@ -408,29 +431,22 @@ void AVDemuxer::dump()
         , {videoStream(),    v_codec_context, "video_stream"}
         , {0,                0,               0}
     };
+    AVStream *stream = 0;
     for (int idx = 0; stream_infos[idx].name != 0; ++idx) {
         qDebug("%s: %d", stream_infos[idx].name, stream_infos[idx].index);
-        if (stream_infos[idx].index < 0) {
-            qDebug("stream not available");
+        if (stream_infos[idx].index < 0 || !(stream = format_context->streams[idx])) {
+            qDebug("stream not available: index = %d, stream = %p", stream_infos[idx].index, stream);
             continue;
         }
-        AVStream *stream = format_context->streams[idx];
-        if (!stream)
-            continue;
-        qDebug("[AVStream::start_time = %lld]", stream->start_time);
+        //why not fixed for video without audio?
+        //qDebug("[AVStream::start_time = %lld]", stream->start_time);
         AVCodecContext *ctx = stream_infos[idx].ctx;
         if (ctx) {
-            qDebug("[AVCodecContext::time_base = %d, %d, %.2f %.2f]", ctx->time_base.num, ctx->time_base.den
-                ,1.0 * ctx->time_base.num / (1 + ctx->time_base.den)
-                ,1.0 / (1.0 * ctx->time_base.num / (1 + ctx->time_base.den))
-                );
+            qDebug("[AVCodecContext::time_base = %d / %d = %f]", ctx->time_base.num, ctx->time_base.den, av_q2d(ctx->time_base));
         }
-        qDebug("[AVStream::avg_frame_rate = %d, %d, %.2f]", stream->avg_frame_rate.num, stream->avg_frame_rate.den
-                ,1.0 * stream->avg_frame_rate.num / stream->avg_frame_rate.den);
-        qDebug("[AVStream::r_frame_rate = %d, %d, %.2f]", stream->r_frame_rate.num, stream->r_frame_rate.den
-                ,1.0 * stream->r_frame_rate.num / stream->r_frame_rate.den);
-        qDebug("[AVStream::time_base = %d, %d, %.2f]", stream->time_base.num, stream->time_base.den
-                ,1.0 * stream->time_base.num / stream->time_base.den);
+        ////why avg_frame_rate is not fixed for the same video?
+        //qDebug("[AVStream::avg_frame_rate = %d / %d = %f]", stream->avg_frame_rate.num, stream->avg_frame_rate.den, av_q2d(stream->avg_frame_rate));
+        //qDebug("[AVStream::time_base = %d / %d = %f]", stream->time_base.num, stream->time_base.den, av_q2d(stream->time_base));
     }
 
 }
@@ -601,7 +617,7 @@ bool AVDemuxer::findAVCodec()
                 v_codec_context->thread_type = FF_THREAD_FRAME; //FF_THREAD_SLICE;
                 v_codec_context->thread_count = QThread::idealThreadCount();
             } else {
-                //v_codec_context->lowres = lowres;
+                //v_codec_context->lowres = 0;
             }
         } else if (type == AVMEDIA_TYPE_AUDIO && audio_stream < 0) {
             audio_stream = i;
