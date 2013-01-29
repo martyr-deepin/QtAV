@@ -124,10 +124,12 @@ void VideoThread::run()
             }
         } else { //when to drop off?
             //if (diff > 0) {
-                if (d.delay > kSyncThreshold)
+                if (d.delay > kSyncThreshold) {
                     d.delay -= kSyncThreshold;
-                else if (d.delay <= 0.0) //drop it?
-                    d.delay = kSyncThreshold;
+                } else if (d.delay <= 0.0) {//drop it?
+                    //d.delay = kSyncThreshold;
+                    continue;
+                }
                 qDebug("delay %f/%f", d.delay, d.clock->value());
                 msleep(d.delay);
             //} else {
