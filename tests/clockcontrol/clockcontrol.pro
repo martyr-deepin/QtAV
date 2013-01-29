@@ -8,14 +8,15 @@ QT       += core gui
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-TARGET = sharedoutput
+TARGET = clockcontrol
 TEMPLATE = app
 
 PROJECTROOT = $$PWD/../..
 include($$PROJECTROOT/src/libQtAV.pri)
 preparePaths($$OUT_PWD/../../out)
 
-SOURCES += main.cpp \
+SOURCES += \
+        main.cpp \
         widget.cpp
 
 HEADERS  += widget.h

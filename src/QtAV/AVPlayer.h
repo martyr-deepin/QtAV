@@ -45,6 +45,9 @@ public:
     AVClock* masterClock();
     void setFile(const QString& path);
 	QString file() const;
+    bool load(const QString& path);
+    bool load();
+    bool isLoaded() const;
     /*
      * default: [fmt: PNG, dir: capture, name: basename]
      * replace the existing capture; return the replaced one
@@ -57,30 +60,35 @@ public:
     bool captureVideo();
     bool play(const QString& path);
 	bool isPlaying() const;
-    void pause(bool p);
     bool isPaused() const;
     void setRenderer(VideoRenderer* renderer);
 
     void setMute(bool mute);
     bool isMute() const;
 
+signals:
+    void started();
+    void stopped();
+
 public slots:
+    void pause(bool p);
     void play(); //replay
     void stop();
     void playNextFrame();
+    void seek(qreal pos);
     void seekForward();
     void seekBackward();
+    void updateClock(qint64 msecs); //update AVClock's external clock
 
 protected slots:
     void resizeVideo(const QSize& size);
 
 protected:
-	int avTimerId;
+    bool loaded;
     AVFormatContext	*formatCtx; //changed when reading a packet
     AVCodecContext *aCodecCtx, *vCodecCtx; //set once and not change
     QString path;
     QString capture_name, capture_dir;
-    int m_drop_count;
 
     //the following things are required and must be setted not null
     AVDemuxer demuxer;

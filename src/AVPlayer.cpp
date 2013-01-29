@@ -56,7 +56,7 @@ extern "C"
 namespace QtAV {
 
 AVPlayer::AVPlayer(QObject *parent) :
-	QObject(parent),capture_dir("capture"),renderer(0),audio(0)
+    QObject(parent),loaded(false),capture_dir("capture"),renderer(0),audio(0)
   ,event_filter(0),video_capture(0)
 {
     qDebug("QtAV %s\nCopyright (C) 2012 Wang Bin <wbsecg1@gmail.com>"
@@ -68,7 +68,6 @@ AVPlayer::AVPlayer(QObject *parent) :
      * If close the renderer widget, the the renderer may destroy before waking up.
      */
     connect(qApp, SIGNAL(aboutToQuit()), SLOT(stop()));
-    avTimerId = -1;
     clock = new AVClock(AVClock::AudioClock);
     //clock->setClockType(AVClock::ExternalClock);
 	demuxer.setClock(clock);
@@ -98,13 +97,11 @@ AVPlayer::AVPlayer(QObject *parent) :
 
     event_filter = new EventFilter(this);
 
-    video_capture = new VideoCapture();
+    setVideoCapture(new VideoCapture());
 }
 
 AVPlayer::~AVPlayer()
 {
-    if (avTimerId > 0)
-        killTimer(avTimerId);
     stop();
     if (audio) {
         delete audio;
@@ -146,7 +143,7 @@ void AVPlayer::setMute(bool mute)
 
 bool AVPlayer::isMute() const
 {
-    return audio && audio->isMute();
+    return !audio || audio->isMute();
 }
 
 //TODO: remove?
@@ -155,10 +152,15 @@ void AVPlayer::resizeVideo(const QSize &size)
     renderer->resizeVideo(size); //TODO: deprecate
     //video_dec->resizeVideo(size);
 }
-
+/*
+ * loaded state is the state of current setted file.
+ * For replaying, we can avoid load a seekable file again.
+ * For playing a new file, load() is required.
+ */
 void AVPlayer::setFile(const QString &path)
 {
     this->path = path;
+    loaded = false; //
     //qApp->activeWindow()->setWindowTitle(path); //crash on linux
 }
 
@@ -171,6 +173,7 @@ VideoCapture* AVPlayer::setVideoCapture(VideoCapture *cap)
 {
     VideoCapture *old = video_capture;
     video_capture = cap;
+    video_thread->setVideoCapture(video_capture);
     return old;
 }
 
@@ -196,15 +199,12 @@ bool AVPlayer::captureVideo()
     bool pause_old = isPaused();
     if (!video_capture->isAsync())
         pause(true);
-    double pts = video_thread->currentPts();
-    QByteArray raw_image(video_thread->currentRawImage());
-    //check raw_image? not empty if not empty before
-    video_capture->setRawImageData(raw_image);
-    video_capture->setRawImageSize(video_thread->currentRawImageSize());
     video_capture->setCaptureDir(capture_dir);
     QString cap_name(capture_name);
     if (cap_name.isEmpty())
         cap_name = QFileInfo(path).completeBaseName();
+    //FIXME: pts is not correct because of multi-thread
+    double pts = video_thread->currentPts();
     cap_name += "_" + QString::number(pts, 'f', 3);
     video_capture->setCaptureName(cap_name);
     qDebug("request capture: %s", qPrintable(cap_name));
@@ -257,53 +257,74 @@ bool AVPlayer::isPaused() const
 #endif
 }
 
-//TODO: when is the end
-void AVPlayer::play()
+bool AVPlayer::isLoaded() const
 {
+    return loaded;
+}
+
+bool AVPlayer::load(const QString &path)
+{
+    setFile(path);
+    return load();
+}
+
+bool AVPlayer::load()
+{
+    loaded = false;
     if (path.isEmpty()) {
-		qDebug("No file to play...");
-		return;
-	}
-	if (isPlaying())
-		stop();
-    if (avTimerId > 0)
-        killTimer(avTimerId);
+        qDebug("No file to play...");
+        return loaded;
+    }
     qDebug("loading: %s ...", path.toUtf8().constData());
     if (!demuxer.loadFile(path)) {
-        return;
-	}
+        return loaded;
+    }
+    loaded = true;
     demuxer.dump();
-    Q_ASSERT(clock != 0);
-    clock->reset();
     formatCtx = demuxer.formatContext();
-    vCodecCtx = demuxer.videoCodecContext();
     aCodecCtx = demuxer.audioCodecContext();
+    vCodecCtx = demuxer.videoCodecContext();
     if (audio && aCodecCtx) {
         audio->setSampleRate(aCodecCtx->sample_rate);
         audio->setChannels(aCodecCtx->channels);
-        if (!audio->open())
-            return; //audio not ready
+        if (!audio->open()) {
+            //return; //audio not ready
+        }
     }
-
-    m_drop_count = 0;
-
     audio_dec->setCodecContext(aCodecCtx);
+    video_dec->setCodecContext(vCodecCtx);
+    return loaded;
+}
+
+//FIXME: why no demuxer will not get an eof if replaying by seek(0)?
+void AVPlayer::play()
+{
+    if (isPlaying())
+        stop();
+    /*
+     * avoid load mutiple times when replaying the same seekable file
+     * TODO: force load unseekable stream? avio.seekable. currently you
+     * must setFile() agian to reload an unseekable stream
+     */
+    if (!isLoaded()) { //if (!isLoaded() && !load())
+        if (!load())
+            return;
+    } else {
+        demuxer.seek(0); //FIXME: now assume it is seekable. for unseekable, setFile() again
+    }
+    Q_ASSERT(clock != 0);
+    clock->reset();
+
     if (aCodecCtx) {
         qDebug("Starting audio thread...");
         audio_thread->start(QThread::HighestPriority);
     }
-
-    video_dec->setCodecContext(vCodecCtx);
     if (vCodecCtx) {
         qDebug("Starting video thread...");
         video_thread->start();
     }
-
     demuxer_thread->start();
-
-#if 0
-    avTimerId = startTimer(1000/demuxer.frameRate());
-#endif
+    emit started();
 }
 
 void AVPlayer::stop()
@@ -333,6 +354,7 @@ void AVPlayer::stop()
             video_thread->terminate(); ///if time out
         }
     }
+    emit stopped();
 }
 //FIXME: If not playing, it will just play but not play one frame.
 void AVPlayer::playNextFrame()
@@ -342,6 +364,11 @@ void AVPlayer::playNextFrame()
     }
     pause(false);
     pause(true);
+}
+
+void AVPlayer::seek(qreal pos)
+{
+    demuxer_thread->seek(pos);
 }
 
 void AVPlayer::seekForward()
@@ -354,48 +381,9 @@ void AVPlayer::seekBackward()
     demuxer_thread->seekBackward();
 }
 
-//TODO: what if no audio stream?
-void AVPlayer::timerEvent(QTimerEvent* e)
+void AVPlayer::updateClock(qint64 msecs)
 {
-    if (e->timerId() != avTimerId)
-        return;
-    AVPacket packet;
-    int videoStream = demuxer.videoStream();
-    int audioStream = demuxer.audioStream();
-    while (av_read_frame(formatCtx, &packet) >=0 ) {
-        Packet pkt;
-        pkt.data = QByteArray((const char*)packet.data, packet.size);
-        pkt.duration = packet.duration;
-        if (packet.dts != AV_NOPTS_VALUE) //has B-frames
-            pkt.pts = packet.dts;
-        else if (packet.pts != AV_NOPTS_VALUE)
-            pkt.pts = packet.pts;
-        else
-            pkt.pts = 0;
-        AVStream *stream = formatCtx->streams[packet.stream_index];
-        pkt.pts *= av_q2d(stream->time_base);
-
-        if (stream->codec->codec_type == AVMEDIA_TYPE_SUBTITLE
-                && (packet.flags & AV_PKT_FLAG_KEY)
-                &&  packet.convergence_duration != AV_NOPTS_VALUE)
-            pkt.duration = packet.convergence_duration * av_q2d(stream->time_base);
-        else if (packet.duration > 0)
-            pkt.duration = packet.duration * av_q2d(stream->time_base);
-        else
-            pkt.duration = 0;
-
-        if (packet.stream_index == audioStream) {
-            audio_thread->packetQueue()->put(pkt);
-            av_free_packet(&packet); //TODO: why is needed for static var?
-        } else if (packet.stream_index == videoStream) {
-            if (video_dec->decode(QByteArray((char*)packet.data, packet.size)))
-                renderer->writeData(video_dec->data());
-            break;
-        } else { //subtitle
-            av_free_packet(&packet);
-            continue;
-        }
-    }
+    clock->updateExternalClock(msecs);
 }
 
 } //namespace QtAV

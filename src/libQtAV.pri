@@ -160,7 +160,14 @@ openal {
     win32:LIBS *= -lOpenAL32
     else: LIBS *= -lopenal
 }
-
+ipp-link {
+    DEFINES += IPP_LINK
+    ICCROOT = $$(IPPROOT)/../compiler
+    INCLUDEPATH += $$(IPPROOT)/include
+    LIBS *= -L$$(IPPROOT)/lib/intel64 -L$$(IPPROOT)/lib/ia32 -lippcc -lippcore -lippi \
+            -L$$(IPPROOT)/../compiler/lib/ia32 -L$$(IPPROOT)/../compiler/lib/intel64 -lsvml -limf
+    #omp for static link. _t is multi-thread static link
+}
 unset(LIB_VERSION)
 unset(PROJECT_SRCPATH)
 unset(PROJECT_LIBDIR)
