@@ -27,8 +27,16 @@ extern "C"
 #include <libswscale/swscale.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/avutil.h>
+
+#ifndef AV_VERSION_INT
+#define AV_VERSION_INT(a, b, c) (a<<16 | b<<8 | c)
+#endif //AV_VERSION_INT
+
+
+#if (LIBAVUTIL_VERSION_INT > AV_VERSION_INT(49, 15, 0))
 #include <libavutil/error.h>
 #include <libavutil/opt.h>
+#endif
 #ifdef __cplusplus
 }
 #endif //__cplusplus
@@ -59,10 +67,20 @@ extern "C"
  * see av_err2str
  */
 
-#ifndef AV_VERSION_INT
-#define AV_VERSION_INT(a, b, c) (a<<16 | b<<8 | c)
-#endif //AV_VERSION_INT
+#if LIBAVCODEC_VERSION_INT <= AV_VERSION_INT(52, 20, 1)
+//AVMediaType
+#define AVMediaType             CodecType
+#define AVMEDIA_TYPE_UNKNOWN    CODEC_TYPE_UNKNOWN
+#define AVMEDIA_TYPE_VIDEO      CODEC_TYPE_VIDEO
+#define AVMEDIA_TYPE_AUDIO      CODEC_TYPE_AUDIO
+#define AVMEDIA_TYPE_DATA       CODEC_TYPE_DATA
+#define AVMEDIA_TYPE_SUBTITLE   CODEC_TYPE_SUBTITLE
+#define AVMEDIA_TYPE_ATTACHMENT CODEC_TYPE_ATTACHMENT
+#define AVMEDIA_TYPE_NB         CODEC_TYPE_NB
 
+
+#define avcodec_open2(_avctx, _codec, __options)  avcodec_open(_avctx, _codec)
+#endif //LIBAVCODEC_VERSION_INT <= AV_VERSION_INT(52, 20, 1)
 void ffmpeg_version_print();
 
 //TODO: libav
@@ -72,6 +90,20 @@ void ffmpeg_version_print();
 #undef av_err2str
 //#define av_make_error_string qtav_make_error_string
 #else
+/**
+ * Put a description of the AVERROR code errnum in errbuf.
+ * In case of failure the global variable errno is set to indicate the
+ * error. Even in case of failure av_strerror() will print a generic
+ * error message indicating the errnum provided to errbuf.
+ *
+ * @param errnum      error code to describe
+ * @param errbuf      buffer to which description is written
+ * @param errbuf_size the size in bytes of errbuf
+ * @return 0 on success, a negative value if a description for errnum
+ * cannot be found
+ */
+int av_strerror(int errnum, char *errbuf, size_t errbuf_size);
+
 /**
  * Fill the provided buffer with a string containing an error string
  * corresponding to the AVERROR code errnum.
