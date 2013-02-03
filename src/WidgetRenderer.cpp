@@ -24,7 +24,6 @@
 #if CONFIG_EZX
 #include <qwallpaper.h>
 #endif //CONFIG_EZX
-#include <QtAV/EventFilter.h>
 
 namespace QtAV {
 WidgetRenderer::WidgetRenderer(QWidget *parent, Qt::WindowFlags f) :
@@ -44,12 +43,6 @@ WidgetRenderer::WidgetRenderer(WidgetRendererPrivate &d, QWidget *parent, Qt::Wi
 
 WidgetRenderer::~WidgetRenderer()
 {
-}
-
-void WidgetRenderer::registerEventFilter(EventFilter *filter)
-{
-    d_func().event_filter = filter;
-    installEventFilter(filter);
 }
 
 bool WidgetRenderer::write()

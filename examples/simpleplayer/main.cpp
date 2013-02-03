@@ -1,5 +1,5 @@
 /******************************************************************************
-    QtAV:  Media play library based on Qt and FFmpeg
+    Simple Player:  this file is part of QtAV examples
     Copyright (C) 2012-2013 Wang Bin <wbsecg1@gmail.com>
 
     This program is free software: you can redistribute it and/or modify

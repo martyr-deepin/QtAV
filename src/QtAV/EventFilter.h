@@ -17,27 +17,26 @@
 ******************************************************************************/
 
 
-#ifndef EVENTFILTER_H
-#define EVENTFILTER_H
+#ifndef QTAV_EVENTFILTER_H
+#define QTAV_EVENTFILTER_H
 
+/*
+ * This class is used interally as QtAV's default event filter. It is suite for single player object
+ */
 #include <QtCore/QObject>
 
 namespace QtAV {
 
-class AVPlayer;
+//for internal use
 class EventFilter : public QObject
 {
     Q_OBJECT
 public:
-    explicit EventFilter(AVPlayer *parent = 0);
-
-    bool filterEvent(QEvent *e);
+    explicit EventFilter(QObject *parent = 0);
+    virtual ~EventFilter();
 protected:
     virtual bool eventFilter(QObject *, QEvent *);
-
-private:
-    AVPlayer *player;
 };
 
 } //namespace QtAV
-#endif // EVENTFILTER_H
+#endif // QTAV_EVENTFILTER_H

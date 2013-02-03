@@ -26,9 +26,9 @@
 struct AVCodecContext;
 struct AVFrame;
 class QImage;
+class QObject;
 namespace QtAV {
 
-class EventFilter;
 class VideoRendererPrivate;
 class Q_EXPORT VideoRenderer : public AVOutput
 {
@@ -46,7 +46,6 @@ public:
     int lastWidth() const;
     int lastHeight() const;
     //TODO: unregister
-    virtual void registerEventFilter(EventFilter* filter);
     virtual bool open();
     virtual bool close();
     virtual QImage currentFrameImage() const = 0; //const QImage& const?

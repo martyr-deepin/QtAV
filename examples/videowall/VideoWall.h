@@ -1,5 +1,5 @@
 /******************************************************************************
-    ImageConverterFF: Image resizing & color model convertion using FFmpeg swscale
+    VideoWall:  this file is part of QtAV examples
     Copyright (C) 2012-2013 Wang Bin <wbsecg1@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
@@ -16,22 +16,34 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
-#ifndef QTAV_IMAGECONVERTERFF_H
-#define QTAV_IMAGECONVERTERFF_H
+#ifndef QTAV_VIDEOWALL_H
+#define QTAV_VIDEOWALL_H
 
-#include <QtAV/ImageConverter.h>
+#include <QtCore/QList>
+#include <QtAV/AVPlayer.h>
+#include <QtAV/WidgetRenderer.h>
 
-namespace QtAV {
-
-class ImageConverterFFPrivate;
-class Q_EXPORT ImageConverterFF : public ImageConverter
+class VideoWall : public QObject
 {
-    DPTR_DECLARE_PRIVATE(ImageConverterFF)
+    Q_OBJECT
 public:
-    ImageConverterFF();
-    virtual bool convert(const quint8 *const srcSlice[], const int srcStride[]);
+    explicit VideoWall(QObject *parent = 0);
+    ~VideoWall();
+    void setRows(int n);
+    void setCols(int n);
+    int rows() const;
+    int cols() const;
+    void show();
+    void play(const QString& file);
+
 protected:
-    virtual bool prepareData(); //Allocate memory for out data
+    virtual bool eventFilter(QObject *, QEvent *);
+    virtual void timerEvent(QTimerEvent *e);
+private:
+    int r, c;
+    int timer_id;
+    QtAV::AVClock *clock;
+    QList<QtAV::AVPlayer*> players;
 };
-} //namespace QtAV
-#endif // QTAV_IMAGECONVERTERFF_H
+
+#endif // QTAV_VIDEOWALL_H
