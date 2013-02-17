@@ -2,42 +2,55 @@
     QtAV:  Media play library based on Qt and FFmpeg
     Copyright (C) 2012-2013 Wang Bin <wbsecg1@gmail.com>
     
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-    
-    This program is distributed in the hope that it will be useful,
+*   This file is part of QtAV
+
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-    
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 ******************************************************************************/
 
 
-#ifndef EVENTFILTER_H
-#define EVENTFILTER_H
+#ifndef QTAV_EVENTFILTER_H
+#define QTAV_EVENTFILTER_H
 
+/*
+ * This class is used interally as QtAV's default event filter. It is suite for single player object
+ */
 #include <QtCore/QObject>
 
+class QMenu;
 namespace QtAV {
 
-class AVPlayer;
+//for internal use
 class EventFilter : public QObject
 {
     Q_OBJECT
 public:
-    explicit EventFilter(AVPlayer *parent = 0);
+    explicit EventFilter(QObject *parent = 0);
+    virtual ~EventFilter();
 
-    bool filterEvent(QEvent *e);
+public slots:
+    void openLocalFile();
+    void openUrl();
+    void about();
+    void help();
+
 protected:
     virtual bool eventFilter(QObject *, QEvent *);
 
 private:
-    AVPlayer *player;
+    QMenu *menu;
 };
 
 } //namespace QtAV
-#endif // EVENTFILTER_H
+#endif // QTAV_EVENTFILTER_H

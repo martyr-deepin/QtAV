@@ -4,11 +4,11 @@ QtAV is a media playing library based on Qt and FFmpeg. It can help you to write
 with less effort than ever before. Currently only a simple player is supplied. I will write a
 stylish one based on QtAV in the feature.
 
-QtAV is free software licensed under the or GPL v3. If you use QtAV or its constituent libraries,
+QtAV is free software licensed under the term of LGPL v2.1. If you use QtAV or its constituent libraries,
 you must adhere to the terms of the license in question.
 
 #### [Download binaries from sourceforge](https://sourceforge.net/projects/qtav/files)
-
+#### [Source code on github](https://github.com/wang-bin/QtAV)
 
 ### Features
 
@@ -22,11 +22,11 @@ QtAV can meet your most demands
 - Volume control
 - Fullscreen, stay on top
 - Compatible: QtAV can be built with both Qt4 and Qt5. QtAV will support
-  both FFMpeg and [Libav](http://libav.org).
+  both FFmpeg and [Libav](http://libav.org).
 
 ### Extensible Framework (not finished)
 
-  QtAV currently uses FFMpeg to decode video, convert image and audio data, and uses PortAudio to play
+  QtAV currently uses FFmpeg to decode video, convert image and audio data, and uses PortAudio to play
   sound. Every part in QtAV is designed to be extensible. For example, you can write your audio output
   class using OpenAL, image converting class using cuda to get better performance etc. These features
   will be added in the feature by default.
@@ -36,27 +36,36 @@ QtAV can meet your most demands
 
 #### Requirements
 
-1. [FFMpeg](http://ffmpeg.org) Latest version is recommanded
+1. [FFmpeg](http://ffmpeg.org) Latest version is recommanded
 2. [Qt 4 or 5](http://qt-project.org/downloads)
 3. [PortAudio v19](http://www.portaudio.com/download.html)
 
 The required development files for MinGW can be found in sourceforge
-page: [mingw_libs-extra.7z](http://sourceforge.net/projects/qtav/files/mingw_libs-extra.7z/download)
+page: [depends](https://sourceforge.net/projects/qtav/files/depends)
 
 #### Build
+
+For most platforms, just
 
     qmake
     make
 
-If you want to build QtAV outside the source tree
+>>If the above command failed to build it, try
 
-    cd your_build_dir
-    qmake QtAV_dir/QtAV.pro -r "BUILD_DIR=your_build_dir"
-    make -j4
+>>    `cd your_build_dir`
 
-  The binaries will be created in $BUILD_DIR/bin
+>>    `qmake QtAV_dir/QtAV.pro -r BUILD_DIR=your_build_dir`
 
-  NOTE: If you are using QtCreator to build the project, you should go to Projects->Build Steps->qmake->Additional arguments, add "BUILD_DIR=your/buid/dir"
+>>    `make`
+
+>>  The binaries will be created in $BUILD_DIR/bin.
+>>  If you are using QtCreator to build the project, you should go to Projects->Build Steps->qmake->Additional arguments, add "BUILD_DIR=your/buid/dir"
+
+##### Build with MSVC
+
+  See the wiki [Compile with MSVC](https://github.com/wang-bin/QtAV/wiki/Compile-with-MSVC)
+
+
 
 #### How To Write a Player
 
@@ -82,6 +91,8 @@ Default Shortcuts
 - M: mute on/off
 - Up / Down: volume + / -
 - -> / <-: seek forward / backward
+- Drag and drop a media file to player
+
 
 The default behavior can be replaced by subclassing the EventFilter class.
 

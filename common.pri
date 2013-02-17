@@ -130,19 +130,61 @@ defineReplace(qtLongName) {
 	return($$LONG_NAME)
 }
 
+defineTest(empty_file) {
+    isEmpty(1): error("empty_file(name) requires one argument")
+#"type NUL >filename" can create an empty file in windows, see http://stackoverflow.com/questions/210201/how-to-create-empty-text-file-from-a-batch-file
+# 'echo. >file' or 'echo >file' will insert a new line, so use stderr
+    win32:isEmpty(QMAKE_SH) {
+        system("echo. 2> $$1")|return(false)
+    } else {
+#if sh is after win's echo, then "echo >$$1" fails because win's echo is used
+        system("sh -c echo 2> $$1")|return(false)
+    }
+}
+
+lessThan(QT_MAJOR_VERSION, 5): {
+
+defineTest(write_file) {
+    !isEmpty(4): error("write_file(name, [content var, [append]]) requires one to three arguments.")
+    ##TODO: 1.how to replace old value
+##getting the value requires a function whose parameter has var name and return a string. join() is the only function
+## var name is $$2.
+## echo a string with "\n" will fail, so we can not use join
+    #val = $$join($$2, $$escape_expand(\n))$$escape_expand(\n)
+    isEmpty(3)|!isEqual(3, append) {
+#system("$$QMAKE_DEL_FILE $$1") #for win commad "del", path format used in qmake such as D:/myfile is not supported, "/" will be treated as an otpion for "del"
+        empty_file($$1)
+    }
+    for(val, $$2) {
+        system("echo $$val >> \"$$1\"")|return(false)
+    }
+    return(true)
+}
+
+#defineTest(cache) {
+#    !isEmpty(4): error("cache(var, [set|add|sub] [transient] [super], [srcvar]) requires one to three arguments.")
+#}
+
+}
+
 #argument 1 is default dir if not defined
 defineTest(getBuildRoot) {
-    !isEmpty($$2): unset(BUILD_DIR)
+    !isEmpty(2): unset(BUILD_DIR)
     isEmpty(BUILD_DIR) {
         BUILD_DIR=$$(BUILD_DIR)
         isEmpty(BUILD_DIR) {
-            BUILD_DIR=$$[BUILD_DIR]
+            build_cache = $$PROJECTROOT/.build.cache #use root project's cache for subdir projects
+            !exists($$build_cache):build_cache = $$PWD/.build.cache #common.pri is in the root dir of a sub project
+            exists($$build_cache):include($$build_cache)
             isEmpty(BUILD_DIR) {
-                !isEmpty(1) {
-                    BUILD_DIR=$$1
-                } else {
-                    BUILD_DIR = $$OUT_PWD
-                    warning(BUILD_DIR not specified, using $$BUILD_DIR)
+                BUILD_DIR=$$[BUILD_DIR]
+                isEmpty(BUILD_DIR) {
+                    !isEmpty(1) {
+                        BUILD_DIR=$$1
+                    } else {
+                        BUILD_DIR = $$OUT_PWD
+                        warning(BUILD_DIR not specified, using $$BUILD_DIR)
+                    }
                 }
             }
         }
@@ -162,7 +204,6 @@ defineTest(preparePaths) {
     #obj is platform dependent
     OBJECTS_DIR = $$qtLongName($$BUILD_DIR/.obj/$$TARGET)
 #before target name changed
-    !isEmpty(PROJECTROOT):TRANSLATIONS *= $$PROJECTROOT/i18n/$${TARGET}_zh-cn.ts $$PROJECTROOT/i18n/$${TARGET}_zh_CN.ts
     isEqual(TEMPLATE, app) {
         DESTDIR = $$BUILD_DIR/bin
 #	TARGET = $$qtLongName($$TARGET)
@@ -170,14 +211,20 @@ defineTest(preparePaths) {
         win32: EXE_EXT = .exe
         CONFIG(release, debug|release): !isEmpty(QMAKE_STRIP): QMAKE_POST_LINK = -$$QMAKE_STRIP $$DESTDIR/$${TARGET}$${EXE_EXT} #.exe in win
     } else: DESTDIR = $$qtLongName($$BUILD_DIR/lib)
-    !build_pass:message(target: $$DESTDIR/$$TARGET)
+    !build_pass {
+        message(target: $$DESTDIR/$$TARGET)
+        !isEmpty(PROJECTROOT) {
+            TRANSLATIONS *= $$PROJECTROOT/i18n/$${TARGET}_zh-cn.ts $$PROJECTROOT/i18n/$${TARGET}_zh_CN.ts
+            export(TRANSLATIONS)
+        }
+    }
 #export vars outside this function
     export(MOC_DIR)
     export(RCC_DIR)
     export(UI_DIR)
     export(OBJECTS_DIR)
     export(DESTDIR)
-    export(TARGET)
+    #export(TARGET)
     return(true)
 }
 COMMON_PRI_INCLUDED = 1

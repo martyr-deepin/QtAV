@@ -1,6 +1,8 @@
 /******************************************************************************
-    ImageConverterFF: Image resizing & color model convertion using FFMpeg swscale
+    VideoWall:  this file is part of QtAV examples
     Copyright (C) 2012-2013 Wang Bin <wbsecg1@gmail.com>
+
+*   This file is part of QtAV
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,22 +18,33 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
-#ifndef QTAV_IMAGECONVERTERFF_H
-#define QTAV_IMAGECONVERTERFF_H
+#include <cstdio>
+#include <cstdlib>
+#include <QApplication>
+#include <QFile>
+#include <QMessageBox>
+#include "VideoWall.h"
 
-#include <QtAV/ImageConverter.h>
-
-namespace QtAV {
-
-class ImageConverterFFPrivate;
-class Q_EXPORT ImageConverterFF : public ImageConverter
+int main(int argc, char *argv[])
 {
-    DPTR_DECLARE_PRIVATE(ImageConverterFF)
-public:
-    ImageConverterFF();
-    virtual bool convert(const quint8 *const srcSlice[], const int srcStride[]);
-protected:
-    virtual bool prepareData(); //Allocate memory for out data
-};
-} //namespace QtAV
-#endif // QTAV_IMAGECONVERTERFF_H
+    QApplication a(argc, argv);
+    int r = 3, c = 3;
+    int idx = 0;
+    if ((idx = a.arguments().indexOf("-r")) > 0)
+        r = a.arguments().at(idx + 1).toInt();
+    if ((idx = a.arguments().indexOf("-c")) > 0)
+        c = a.arguments().at(idx + 1).toInt();
+    VideoWall wall;
+    wall.setRows(r);
+    wall.setCols(c);
+    wall.show();
+    QString file;
+    if (a.arguments().size() > 1)
+        file = a.arguments().last();
+    if (QFile(file).exists()) {
+        wall.play(file);
+    } else {
+        wall.help();
+    }
+    return a.exec();
+}

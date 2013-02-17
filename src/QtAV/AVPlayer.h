@@ -2,18 +2,21 @@
     QtAV:  Media play library based on Qt and FFmpeg
     Copyright (C) 2012-2013 Wang Bin <wbsecg1@gmail.com>
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+*   This file is part of QtAV
 
-    This program is distributed in the hope that it will be useful,
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 ******************************************************************************/
 
 #ifndef QTAV_AVPLAYER_H
@@ -32,7 +35,6 @@ class VideoDecoder;
 class VideoRenderer;
 class AVClock;
 class AVDemuxThread;
-class EventFilter;
 class VideoCapture;
 class Q_EXPORT AVPlayer : public QObject
 {
@@ -61,10 +63,14 @@ public:
     bool play(const QString& path);
 	bool isPlaying() const;
     bool isPaused() const;
-    void setRenderer(VideoRenderer* renderer);
-
+    //this will install the default EventFilter. To use customized filter, register after this
+    VideoRenderer* setRenderer(VideoRenderer* renderer);
+    VideoRenderer* renderer();
+    AudioOutput* audio();
     void setMute(bool mute);
     bool isMute() const;
+    /*only 1 event filter is available. the previous one will be removed. setPlayerEventFilter(0) will remove the event filter*/
+    void setPlayerEventFilter(QObject *obj);
 
 signals:
     void started();
@@ -94,16 +100,15 @@ protected:
     AVDemuxer demuxer;
     AVDemuxThread *demuxer_thread;
     AVClock *clock;
-    VideoRenderer *renderer; //list?
-    AudioOutput *audio;
+    VideoRenderer *_renderer; //list?
+    AudioOutput *_audio;
     AudioDecoder *audio_dec;
     VideoDecoder *video_dec;
     AudioThread *audio_thread;
     VideoThread *video_thread;
 
     //tODO: (un)register api
-    friend class EventFilter;
-    EventFilter *event_filter;
+    QObject *event_filter;
     VideoCapture *video_capture;
     bool paused;
 };

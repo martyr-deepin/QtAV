@@ -2,45 +2,105 @@
     QtAV:  Media play library based on Qt and FFmpeg
     Copyright (C) 2012-2013 Wang Bin <wbsecg1@gmail.com>
     
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-    
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-    
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-******************************************************************************/
+*   This file is part of QtAV
 
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+******************************************************************************/
 
 #include <QtAV/EventFilter.h>
 #include <QApplication>
+#include <QtCore/QUrl>
 #include <QEvent>
 #include <QFileDialog>
+#include <QInputDialog>
 #include <QKeyEvent>
+#include <QMenu>
+#include <QMessageBox>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QtAV/AVPlayer.h>
 #include <QtAV/AudioOutput.h>
+#include <QtAV/VideoRenderer.h>
 
 namespace QtAV {
 
-EventFilter::EventFilter(AVPlayer *parent) :
-    QObject(parent),player(parent)
+EventFilter::EventFilter(QObject *parent) :
+    QObject(parent),menu(0)
 {
+}
+
+EventFilter::~EventFilter()
+{
+    if (menu) {
+        delete menu;
+        menu = 0;
+    }
+}
+
+void EventFilter::openLocalFile()
+{
+    QString file = QFileDialog::getOpenFileName(0, tr("Open a video"));
+    if (file.isEmpty())
+        return;
+    AVPlayer *player = static_cast<AVPlayer*>(parent());
+    player->play(file);
+}
+
+void EventFilter::openUrl()
+{
+    QString url = QInputDialog::getText(0, tr("Open an url"), tr("Url"));
+    if (url.isEmpty())
+        return;
+    AVPlayer *player = static_cast<AVPlayer*>(parent());
+    player->play(url);
+}
+
+void EventFilter::about()
+{
+    QMessageBox::about(0, tr("About QtAV"), aboutQtAV_HTML());
+}
+
+void EventFilter::help()
+{
+    static QString help = "<h4>" +tr("Drag and drop a file to player\n") + "</h4>"
+                       "<p>" + tr("Shortcut:\n") + "</p>"
+                       "<p>" + tr("Space: pause/continue\n") + "</p>"
+                       "<p>" + tr("F: fullscreen on/off\n") + "</p>"
+                       "<p>" + tr("T: stays on top on/off\n") + "</p>"
+                       "<p>" + tr("N: show next frame. Continue the playing by pressing 'Space'\n") + "</p>"
+                       "<p>" + tr("O: open a file\n") + "</p>"
+                       "<p>" + tr("P: replay\n") + "</p>"
+                       "<p>" + tr("S: stop\n") + "</p>"
+                       "<p>" + tr("M: mute on/off\n") + "</p>"
+                       "<p>" + tr("C: capture video") + "</p>"
+                       "<p>" + tr("Up/Down: volume +/-\n") + "</p>"
+                       "<p>" + tr("->/<-: seek forward/backward\n");
+    QMessageBox::about(0, tr("Help"), help);
 }
 
 bool EventFilter::eventFilter(QObject *watched, QEvent *event)
 {
-    //qDebug("EventFilter::eventFilter to %p", watched);
     Q_UNUSED(watched);
-    /*if (watched == reinterpret_cast<QObject*>(player->renderer)) {
-        qDebug("Event target is renderer: %s", watched->objectName().toAscii().constData());
-    }*/
-    //TODO: if not send to QWidget based class, return false; instanceOf()?
+    AVPlayer *player = static_cast<AVPlayer*>(parent());
+    if (!player)
+        return false;
+#ifndef QT_NO_DYNAMIC_CAST //dynamic_cast is defined as a macro to force a compile error
+    if (player->renderer() != dynamic_cast<VideoRenderer*>(watched)) {
+        return false;
+    }
+#endif
     QEvent::Type type = event->type();
     switch (type) {
     case QEvent::MouseButtonPress:
@@ -50,8 +110,6 @@ bool EventFilter::eventFilter(QObject *watched, QEvent *event)
         return false;
         break;
     case QEvent::KeyPress: {
-        //qDebug("Event target = %p %p", watched, player->renderer);
-        //avoid receive an event multiple times
         int key = static_cast<QKeyEvent*>(event)->key();
         switch (key) {
         case Qt::Key_C: //capture
@@ -81,37 +139,34 @@ bool EventFilter::eventFilter(QObject *watched, QEvent *event)
         }
             break;
         case Qt::Key_Up:
-            if (player->audio) {
-                qreal v = player->audio->volume();
+            if (player->audio()) {
+                qreal v = player->audio()->volume();
                 if (v > 0.5)
                     v += 0.1;
                 else if (v > 0.1)
                     v += 0.05;
                 else
                     v += 0.025;
-                player->audio->setVolume(v);
-                qDebug("vol = %.3f", player->audio->volume());
+                player->audio()->setVolume(v);
+                qDebug("vol = %.3f", player->audio()->volume());
             }
             break;
         case Qt::Key_Down:
-            if (player->audio) {
-                qreal v = player->audio->volume();
+            if (player->audio()) {
+                qreal v = player->audio()->volume();
                 if (v > 0.5)
                     v -= 0.1;
                 else if (v > 0.1)
                     v -= 0.05;
                 else
                     v -= 0.025;
-                player->audio->setVolume(v);
-                qDebug("vol = %.3f", player->audio->volume());
+                player->audio()->setVolume(v);
+                qDebug("vol = %.3f", player->audio()->volume());
             }
             break;
-        case Qt::Key_O: {
-            //TODO: emit a signal so we can use custome dialogs
-            QString file = QFileDialog::getOpenFileName(0, tr("Open a video"));
-            if (!file.isEmpty())
-                player->play(file);
-        }
+        case Qt::Key_O:
+            //TODO: emit a signal so we can use custome dialogs?
+            openLocalFile();
             break;
         case Qt::Key_Left:
             qDebug("<-");
@@ -122,8 +177,8 @@ bool EventFilter::eventFilter(QObject *watched, QEvent *event)
             player->seekForward();
             break;
         case Qt::Key_M:
-            if (player->audio) {
-                player->audio->setMute(!player->audio->isMute());
+            if (player->audio()) {
+                player->audio()->setMute(!player->audio()->isMute());
             }
             break;
         case Qt::Key_T: {
@@ -142,10 +197,42 @@ bool EventFilter::eventFilter(QObject *watched, QEvent *event)
             w->show();
         }
             break;
+        case Qt::Key_F1:
+            help();
+            break;
         default:
             return false;
         }
         break;
+    }
+    case QEvent::DragEnter:
+    case QEvent::DragMove: {
+        QDropEvent *e = static_cast<QDropEvent*>(event);
+        e->acceptProposedAction();
+    }
+        break;
+    case QEvent::Drop: {
+        QDropEvent *e = static_cast<QDropEvent*>(event);
+        QString path = e->mimeData()->urls().first().toLocalFile();
+        player->stop();
+        player->load(path);
+        player->play();
+        e->acceptProposedAction();
+    }
+        break;
+    case QEvent::ContextMenu: {
+        QContextMenuEvent *e = static_cast<QContextMenuEvent*>(event);
+        if (!menu) {
+            menu = new QMenu();
+            menu->addAction(tr("Open"), this, SLOT(openLocalFile()));
+            menu->addAction(tr("Open Url"), this, SLOT(openUrl()));
+            menu->addSeparator();
+            menu->addAction(tr("About"), this, SLOT(about()));
+            menu->addAction(tr("Help"), this, SLOT(help()));
+            menu->addSeparator();
+            menu->addAction(tr("About Qt"), qApp, SLOT(aboutQt()));
+        }
+        menu->exec(e->globalPos());
     }
     default:
         return false;

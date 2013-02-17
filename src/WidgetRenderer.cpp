@@ -2,18 +2,21 @@
     QtAV:  Media play library based on Qt and FFmpeg
     Copyright (C) 2012-2013 Wang Bin <wbsecg1@gmail.com>
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+*   This file is part of QtAV
 
-    This program is distributed in the hope that it will be useful,
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 ******************************************************************************/
 
 #include <QtAV/WidgetRenderer.h>
@@ -21,19 +24,13 @@
 #include <qfont.h>
 #include <qevent.h>
 #include <qpainter.h>
-#if CONFIG_EZX
-#include <qwallpaper.h>
-#endif //CONFIG_EZX
-#include <QtAV/EventFilter.h>
 
 namespace QtAV {
 WidgetRenderer::WidgetRenderer(QWidget *parent, Qt::WindowFlags f) :
     QWidget(parent, f),ImageRenderer(*new WidgetRendererPrivate())
 {
+    setAcceptDrops(true);
     setFocusPolicy(Qt::StrongFocus);
-#if CONFIG_EZX
-    QWallpaper::setAppWallpaperMode(QWallpaper::Off);
-#endif
     setAutoFillBackground(false);
 }
 
@@ -46,27 +43,9 @@ WidgetRenderer::~WidgetRenderer()
 {
 }
 
-void WidgetRenderer::registerEventFilter(EventFilter *filter)
-{
-    d_func().event_filter = filter;
-    installEventFilter(filter);
-}
-
 bool WidgetRenderer::write()
 {
-#if CONFIG_EZX
-    QPixmap pix;
-    pix.convertFromImage(d_func().image);
-    //QPainter v_p(&pix);
-#else
-    //QPainter v_p(&image);
-#endif //CONFIG_EZX
-
-#if CONFIG_EZX
-    bitBlt(this, QPoint(), &pix);
-#else
     update();
-#endif
 	return true;
 }
 
@@ -121,11 +100,7 @@ void WidgetRenderer::mouseMoveEvent(QMouseEvent *e)
         resize(w, h);
         break;
     }
-#if CONFIG_EZX
-    repaint(false);
-#else
     repaint();
-#endif
 }
 
 void WidgetRenderer::mouseDoubleClickEvent(QMouseEvent *)
@@ -137,7 +112,6 @@ void WidgetRenderer::mouseDoubleClickEvent(QMouseEvent *)
         d.action = GestureMove;
 }
 
-#if !CONFIG_EZX
 void WidgetRenderer::paintEvent(QPaintEvent *)
 {
     DPTR_D(WidgetRenderer);
@@ -164,7 +138,7 @@ void WidgetRenderer::paintEvent(QPaintEvent *)
         }
     } else {
         d.preview = QImage(videoSize(), QImage::Format_RGB32);
-        d.preview.fill(QColor(Qt::black));
+        d.preview.fill(Qt::black); //maemo 4.7.0: QImage.fill(uint)
         p.drawImage(QPoint(), d.preview);
     }
     if (!d.scale_in_qt) {
@@ -172,12 +146,4 @@ void WidgetRenderer::paintEvent(QPaintEvent *)
     }
 }
 
-void WidgetRenderer::dragEnterEvent(QDragEnterEvent *)
-{
-}
-
-void WidgetRenderer::dropEvent(QDropEvent *)
-{
-}
-#endif //CONFIG_EZX
 } //namespace QtAV

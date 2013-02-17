@@ -1,9 +1,13 @@
 TEMPLATE = lib
+TARGET = QtAV
 
 QT += core gui opengl
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG *= qtav-buildlib
+CONFIG *= portaudio
+#CONFIG *= openal
+
 #var with '_' can not pass to pri?
 STATICLINK = 0
 PROJECTROOT = $$PWD/..
@@ -12,23 +16,45 @@ preparePaths($$OUT_PWD/../out)
 
 win32:RC_FILE = $${PROJECTROOT}/res/QtAV.rc
 OTHER_FILES += $$RC_FILE
-#src
-unix: SOURCES += 
-else:win32: SOURCES += 
+
+TRANSLATIONS = $${PROJECTROOT}/i18n/QtAV_zh_CN.ts
+
+*msvc* {
+    INCLUDEPATH += compat/msvc
+}
+#UINT64_C: C99 math features, need -D__STDC_CONSTANT_MACROS in CXXFLAGS
+DEFINES += __STDC_CONSTANT_MACROS
+
+LIBS += -Lextra -lavcodec -lavformat -lavutil -lswscale
+
+ipp-link {
+    DEFINES += IPP_LINK
+    ICCROOT = $$(IPPROOT)/../compiler
+    INCLUDEPATH += $$(IPPROOT)/include
+    LIBS *= -L$$(IPPROOT)/lib/intel64 -L$$(IPPROOT)/lib/ia32 -lippcc -lippcore -lippi \
+            -L$$(IPPROOT)/../compiler/lib/ia32 -L$$(IPPROOT)/../compiler/lib/intel64 -lsvml -limf
+    #omp for static link. _t is multi-thread static link
+}
 
 portaudio {
-SOURCES += AOPortAudio.cpp
-HEADERS += QtAV/AOPortAudio.h \
-           QtAV/private/AOPortAudio_p.h
+    SOURCES += AOPortAudio.cpp
+    HEADERS += QtAV/AOPortAudio.h
+    DEFINES *= HAVE_PORTAUDIO=1
+    LIBS *= -lportaudio
+    #win32: LIBS *= -lwinmm #-lksguid #-luuid
 }
 openal {
-SOURCES += AOOpenAL.cpp
-HEADERS += QtAV/AOOpenAL.h \
-           QtAV/private/AOOpenAL_p.h
+    SOURCES += AOOpenAL.cpp
+    HEADERS += QtAV/AOOpenAL.h \
+               QtAV/private/AOOpenAL_p.h
+    DEFINES *= HAVE_OPENAL=1
+    win32:LIBS *= -lOpenAL32
+    else: LIBS *= -lopenal
 }
 
 SOURCES += \
     QtAV_Compat.cpp \
+    QtAV_Global.cpp \
     AudioThread.cpp \
     AVThread.cpp \
     AudioDecoder.cpp \
@@ -50,7 +76,8 @@ SOURCES += \
     AVOutput.cpp \
     AVClock.cpp \
     VideoDecoder.cpp \
-    VideoThread.cpp
+    VideoThread.cpp \
+    ImageConverterTypes.cpp
 
 HEADERS += \
     QtAV/prepost.h \
@@ -77,8 +104,6 @@ HEADERS += \
     QtAV/BlockingQueue.h \
     QtAV/GraphicsItemRenderer.h \
     QtAV/ImageConverter.h \
-    QtAV/ImageConverterFF.h \
-    QtAV/ImageConverterIPP.h \
     QtAV/ImageRenderer.h \
     QtAV/Packet.h \
     QtAV/AVPlayer.h \
@@ -88,4 +113,8 @@ HEADERS += \
     QtAV/AVOutput.h \
     QtAV/AVClock.h \
     QtAV/VideoDecoder.h \
-    QtAV/VideoThread.h
+    QtAV/VideoThread.h \
+    QtAV/singleton.h \
+    QtAV/factory.h \
+    QtAV/FactoryDefine.h \
+    QtAV/ImageConverterTypes.h
