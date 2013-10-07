@@ -43,6 +43,16 @@ TRANSLATIONS = $${PROJECTROOT}/i18n/QtAV_zh_CN.ts
 DEFINES += __STDC_CONSTANT_MACROS
 
 LIBS += -Lextra -lavcodec -lavformat -lavutil -lswscale
+CONFIG += config_cuda
+config_cuda {
+    DEFINES += QTAV_HAVE_CUDA=1
+    SOURCES += VideoDecoderCUDA.cpp
+    LIBS += -lnvcuvid -lcuda
+}
+config_dxva {
+    DEFINES += QTAV_HAVE_DXVA=1
+    SOURCES += VideoDecoderFFmpegDXVA.cpp
+}
 config_swresample {
     DEFINES += QTAV_HAVE_SWRESAMPLE=1
     SOURCES += AudioResamplerFF.cpp

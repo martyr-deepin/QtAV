@@ -778,7 +778,7 @@ void AVPlayer::setupVideoThread()
 {
     if (vCodecCtx) {
         if (!video_dec) {
-            video_dec = VideoDecoderFactory::create(VideoDecoderId_FFmpeg);
+            video_dec = VideoDecoderFactory::create(VideoDecoderId_CUDA);
         }
         video_dec->setCodecContext(vCodecCtx);
         video_dec->prepare();
