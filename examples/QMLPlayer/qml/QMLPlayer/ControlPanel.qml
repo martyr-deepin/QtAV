@@ -1,9 +1,8 @@
 import QtQuick 2.0
 import "utils.js" as Utils
 
-// TODO: Control.qml
 Rectangle {
-    id: control
+    id: root
     color: "black"
     opacity: 0.9
     radius: 10
@@ -61,19 +60,15 @@ Rectangle {
     MouseArea {
         anchors.fill: parent
         hoverEnabled: true
-        // onEntered, onExited
-        onHoveredChanged: {
-            //var m = mapToItem(control, mouse.x, mouse.y)
-            // TODO: why control.contains(m) always true?
-            if (containsMouse) {
-                if (timer.running) //timer may ran a few seconds(<3) ago
-                    timer.stop();
-                control.aniShow()
-            } else {
-                //if (player.playbackState !== MediaPlayer.StoppedState)
-                if (playState !== "stop")
-                    timer.start()
-            }
+        //preventStealing: true
+        onEntered: {
+            if (timer.running) //timer may ran a few seconds(<3) ago
+                timer.stop();
+            root.aniShow()
+        }
+        onExited: {
+            if (playState !== "stop")
+                timer.start()
         }
     }
     ProgressBar {
@@ -161,6 +156,8 @@ Rectangle {
             font.bold: true
             horizontalAlignment: Qt.AlignHCenter
             verticalAlignment: Qt.AlignVCenter
+            onContentHeightChanged: parent.height = contentHeight + 2
+            onContentWidthChanged: parent.width = contentWidth + 2
         }
         states: [
             State {
@@ -376,8 +373,8 @@ Rectangle {
         id: timer
         interval: 3000
         onTriggered: {
-            control.aniHide()
-            //control.visible = false //no mouse event
+            root.aniHide()
+            //root.visible = false //no mouse event
         }
     }
     function hideIfTimedout() {
@@ -385,16 +382,16 @@ Rectangle {
     }
     PropertyAnimation {
         id: anim
-        target: control
+        target: root
         properties: "opacity"
         function reverse() {
             duration = 1500
             to = 0
-            from = control.opacity
+            from = root.opacity
         }
         function reset() {
             duration = 200
-            from = control.opacity
+            from = root.opacity
             to = 0.9
         }
     }

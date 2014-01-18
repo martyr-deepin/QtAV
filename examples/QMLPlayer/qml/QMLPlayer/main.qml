@@ -106,6 +106,7 @@ Rectangle {
         onShowInfo: {
             help.text = player.source
             help.visible = true
+            configPanel.state = configPanel.state == "show" ? "hide" : "show"
         }
         onShowHelp: {
             help.text = help.helpText()
@@ -192,6 +193,80 @@ Rectangle {
             }
         }
     }
+
+    Item {
+        id: configPage
+        //color: "black"
+        //opacity: 0.7
+        property Item current
+        anchors {
+            left: parent.left
+            right: parent.right //configPanel.left
+            top: parent.top
+            bottom: control.top
+        }
+        VideoCodec {
+            id: videoCodecPage
+            visible: false
+            //anchors.fill: parent
+            anchors.centerIn: parent
+            anchors.margins: 0
+
+            width: parent.width - 2*configPanel.width
+            height: 200
+
+            title: qsTr("Video Codec")
+        }
+    }
+    ConfigPanel {
+        id: configPanel
+        anchors {
+            top: parent.top
+            //right: parent.right
+            bottom: control.top
+        }
+        x: root.width
+        width: 140
+        onSelectedChanged: {
+            // TODO: use enum
+            if (configPage.current)
+                configPage.current.visible = false
+            configPage.current = null
+            if (selected == "Video codec") {
+                configPage.current = videoCodecPage
+            }
+            if (configPage.current)
+                configPage.current.visible = true
+        }
+        onStateChanged: {
+            if (state != "show") {
+                if (configPage.current)
+                    configPage.current.visible = false
+            }
+        }
+
+        states: [
+            State {
+                name: "show"
+                PropertyChanges {
+                    target: configPanel
+                    x: root.width - configPanel.width
+                }
+            }
+        ]
+        transitions: [
+            Transition {
+                from: "*"
+                to: "*"
+                PropertyAnimation {
+                    properties: "x"
+                    easing.type: Easing.OutQuart
+                    duration: 500
+                }
+            }
+        ]
+    }
+
 
     FileDialog {
         id: fileDialog

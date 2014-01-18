@@ -6,5 +6,7 @@
         <file>qml/QMLPlayer/Slider.qml</file>
         <file>qml/QMLPlayer/utils.js</file>
         <file>qml/QMLPlayer/ControlPanel.qml</file>
+        <file>qml/QMLPlayer/VideoCodec.qml</file>
+        <file>qml/QMLPlayer/ConfigPanel.qml</file>
     </qresource>
 </RCC>
