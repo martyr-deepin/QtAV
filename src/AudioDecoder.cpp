@@ -103,6 +103,7 @@ bool AudioDecoder::decode(const QByteArray &encoded)
     }
     if (!d.got_frame_ptr) {
         qWarning("[AudioDecoder] got_frame_ptr=false. decoded: %d, un: %d", ret, d.undecoded_size);
+        d.decoded.clear();
         return true;
     }
 #if !QTAV_HAVE(SWRESAMPLE) && !QTAV_HAVE(AVRESAMPLE)
@@ -215,6 +216,7 @@ bool AudioDecoder::decode(const QByteArray &encoded)
         break;
     }
 #else
+    //qDebug("samples/ch=%d, linesize0=%d, samplesize=%d", d.frame->nb_samples, d.frame->linesize[1], d.frame->linesize[0]/d.frame->nb_samples);
     d.resampler->setInSampesPerChannel(d.frame->nb_samples);
     if (!d.resampler->convert((const quint8**)d.frame->extended_data)) {
         return false;
@@ -223,6 +225,22 @@ bool AudioDecoder::decode(const QByteArray &encoded)
     return true;
 #endif //!(QTAV_HAVE(SWRESAMPLE) && !QTAV_HAVE(AVRESAMPLE))
     return !d.decoded.isEmpty();
+}
+
+AudioFrame AudioDecoder::frame()
+{
+    DPTR_D(AudioDecoder);
+    if (!d.codec_ctx)
+        return AudioFrame();
+    AudioFormat af;
+    af.setSampleFormatFFmpeg(d.frame->format);
+    af.setChannelLayoutFFmpeg(d.frame->channel_layout);
+    AudioFrame f(QByteArray(), af);
+    f.setSamplesPerChannel(d.frame->nb_samples);
+    for (int i = 0; i < af.planeCount(); ++i) {
+        f.setBits(d.frame->extended_data[i], i);
+    }
+    return f;
 }
 
 AudioResampler* AudioDecoder::resampler()

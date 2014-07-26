@@ -23,6 +23,7 @@
 #define QAV_AUDIODECODER_H
 
 #include <QtAV/AVDecoder.h>
+#include <QtAV/AudioFrame.h>
 
 //TODO: decoder.in/outAudioFormat()?
 namespace QtAV {
@@ -36,6 +37,7 @@ public:
     AudioDecoder();
     virtual bool prepare();
     virtual bool decode(const QByteArray &encoded);
+    virtual AudioFrame frame();
     AudioResampler *resampler();
 };
 
