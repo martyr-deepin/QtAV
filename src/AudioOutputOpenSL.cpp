@@ -22,6 +22,12 @@
 #include <SLES/OpenSLES.h>
 #include "prepost.h"
 
+#define NO_ANDROID 1
+#if !NO_ANDROID
+#if defined(Q_OS_ANDROID)
+#include <SLES/OpenSLES_Android.h>
+#endif
+#endif //!NO_ANDROID
 namespace QtAV {
 
 class AudioOutputOpenSLPrivate;
@@ -96,7 +102,7 @@ public:
         , m_bufferQueueItf(0)
         , m_notifyInterval(1000)
         , buffers_queued(0)
-        , callback_mode(true)
+        , callback_mode(false)
     {
         SL_RUN_CHECK(slCreateEngine(&engineObject, 0, 0, 0, 0, 0));
         SL_RUN_CHECK((*engineObject)->Realize(engineObject, SL_BOOLEAN_FALSE));
@@ -107,11 +113,15 @@ public:
         if (engineObject)
             (*engineObject)->Destroy(engineObject);
     }
-    static void bufferQueueCallback(SLBufferQueueItf bufferQueue, void *context)
-    {
+#if !NO_ANDROID && defined(Q_OS_ANDROID)
+    static void bufferQueueCallback(SLAndroidSimpleBufferQueueItf bufferQueue, void *context) {
+        SLAndroidSimpleBufferQueueState state;
+#else
+    static void bufferQueueCallback(SLBufferQueueItf bufferQueue, void *context) {
         SLBufferQueueState state;
+#endif
         (*bufferQueue)->GetState(bufferQueue, &state);
-        //qDebug(">>>>>>>>>>>>>>bufferQueueCallback state.count=%lu .playIndex=%lu", state.count, state.playIndex);
+        //qDebug(">>>>>>>>>>>>>>bufferQueueCallback state.count=%lu .playIndex=%lu", state.count, state.index);
         AudioOutputOpenSLPrivate *priv = reinterpret_cast<AudioOutputOpenSLPrivate*>(context);
         if (priv->callback_mode) {
             priv->cond.wakeAll();
@@ -130,7 +140,11 @@ public:
     SLObjectItf m_playerObject;
     SLPlayItf m_playItf;
     SLVolumeItf m_volumeItf;
+#if !NO_ANDROID && defined(Q_OS_ANDROID)
+    SLAndroidSimpleBufferQueueItf m_bufferQueueItf;
+#else
     SLBufferQueueItf m_bufferQueueItf;
+#endif
     int m_notifyInterval;
     quint32 buffers_queued;
     bool callback_mode;
@@ -174,22 +188,32 @@ bool AudioOutputOpenSL::open()
 {
     DPTR_D(AudioOutputOpenSL);
     d.available = false;
+#if !NO_ANDROID && defined(Q_OS_ANDROID)
+    SLDataLocator_AndroidSimpleBufferQueue bufferQueueLocator = { SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, (SLuint32)d.nb_buffers };
+#else
     SLDataLocator_BufferQueue bufferQueueLocator = { SL_DATALOCATOR_BUFFERQUEUE, (SLuint32)d.nb_buffers };
+#endif
     SLDataFormat_PCM pcmFormat = audioFormatToSL(audioFormat());
     SLDataSource audioSrc = { &bufferQueueLocator, &pcmFormat };
     // OutputMix
-    SL_RUN_CHECK_FALSE((*d.engine)->CreateOutputMix(d.engine, &d.m_outputMixObject, 0, NULL, NULL));
+    //const SLInterfaceID ids[] = { SL_IID_VOLUME };
+    //const SLboolean req[] = { SL_BOOLEAN_FALSE };
+    SL_RUN_CHECK_FALSE((*d.engine)->CreateOutputMix(d.engine, &d.m_outputMixObject, 0, NULL, NULL));////1, {SL_IID_VOLUME}, {SL_BOOLEAN_FALSE}));
     SL_RUN_CHECK_FALSE((*d.m_outputMixObject)->Realize(d.m_outputMixObject, SL_BOOLEAN_FALSE));
     SLDataLocator_OutputMix outputMixLocator = { SL_DATALOCATOR_OUTPUTMIX, d.m_outputMixObject };
     SLDataSink audioSink = { &outputMixLocator, NULL };
 
-    const SLInterfaceID ids[] = { SL_IID_BUFFERQUEUE};//, SL_IID_VOLUME };
-    const SLboolean req[] = { SL_BOOLEAN_TRUE};//, SL_BOOLEAN_TRUE };
+#if !NO_ANDROID && defined(Q_OS_ANDROID)
+    const SLInterfaceID ids[] = { SL_IID_ANDROIDSIMPLEBUFFERQUEUE, SL_IID_VOLUME };
+#else
+    const SLInterfaceID ids[] = { SL_IID_BUFFERQUEUE, SL_IID_VOLUME };
+#endif
+    const SLboolean req[] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE };
     // AudioPlayer
     SL_RUN_CHECK_FALSE((*d.engine)->CreateAudioPlayer(d.engine, &d.m_playerObject, &audioSrc, &audioSink, sizeof(ids)/sizeof(ids[0]), ids, req));
     SL_RUN_CHECK_FALSE((*d.m_playerObject)->Realize(d.m_playerObject, SL_BOOLEAN_FALSE));
     // Buffer interface
-    SL_RUN_CHECK_FALSE((*d.m_playerObject)->GetInterface(d.m_playerObject, SL_IID_BUFFERQUEUE, &d.m_bufferQueueItf));
+    SL_RUN_CHECK_FALSE((*d.m_playerObject)->GetInterface(d.m_playerObject, ids[0], &d.m_bufferQueueItf));
     SL_RUN_CHECK_FALSE((*d.m_bufferQueueItf)->RegisterCallback(d.m_bufferQueueItf, AudioOutputOpenSLPrivate::bufferQueueCallback, &d));
     // Play interface
     SL_RUN_CHECK_FALSE((*d.m_playerObject)->GetInterface(d.m_playerObject, SL_IID_PLAY, &d.m_playItf));
@@ -204,7 +228,7 @@ bool AudioOutputOpenSL::open()
 #endif
     // Volume interface
     //SL_RUN_CHECK_FALSE((*d.m_playerObject)->GetInterface(d.m_playerObject, SL_IID_VOLUME, &d.m_volumeItf));
-
+   // SL_RUN_CHECK_FALSE((*d.m_volumeItf)->SetVolumeLevel(d.m_volumeItf, SL_MILLIBEL_MAX));
     const int kBufferSize = 1024*4;
     static char init_data[kBufferSize];
     memset(init_data, 0, sizeof(init_data));
@@ -259,9 +283,13 @@ void AudioOutputOpenSL::waitForNextBuffer()
     if (!d.canRemoveBuffer()) {
         return;
     }
+#if !NO_ANDROID && defined(Q_OS_ANDROID)
+    SLAndroidSimpleBufferQueueState state;
+#else
     SLBufferQueueState state;
+#endif
     (*d.m_bufferQueueItf)->GetState(d.m_bufferQueueItf, &state);
-    //qDebug(">>>>>>>>>>>>>>bufferQueueCallback state.count=%lu .playIndex=%lu", state.count, state.playIndex);
+    //qDebug(">>>>>>>>>>>>>>bufferQueueCallback state.count=%lu .playIndex=%lu", state.count, state.index);
     // number of buffers in queue
     if (state.count <= 0) {
         return;
