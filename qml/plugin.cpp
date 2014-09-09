@@ -36,10 +36,10 @@ public:
     void registerTypes(const char *uri)
     {
         Q_ASSERT(uri == QLatin1String("QtAV"));
-        qmlRegisterType<QQuickItemRenderer>(uri, 1, 3, "VideoOutput");
-        qmlRegisterType<QmlAVPlayer>(uri, 1, 3, "AVPlayer");
-        qmlRegisterType<QmlAVPlayer>(uri, 1, 3, "MediaPlayer");
-        qmlRegisterType<QuickSubtitle>(uri, 1, 3, "Subtitle");
+        qmlRegisterType<QQuickItemRenderer>(uri, 1, 4, "VideoOutput");
+        qmlRegisterType<QmlAVPlayer>(uri, 1, 4, "AVPlayer");
+        qmlRegisterType<QmlAVPlayer>(uri, 1, 4, "MediaPlayer");
+        qmlRegisterType<QuickSubtitle>(uri, 1, 4, "Subtitle");
     }
 };
 } //namespace QtAV
