@@ -440,6 +440,7 @@ void X11Renderer::drawBackground()
     XFlush(d.display); // apply the color
 }
 
+// hanlePaintEvent() { lock, resize, set filter parameters: ximage_data ptr, etc, VideoRenderer::handlePaintEvent}
 void X11Renderer::drawFrame()
 {
     // TODO: interop
@@ -449,6 +450,31 @@ void X11Renderer::drawFrame()
     if (preferredPixelFormat() != d.pixfmt) {
         qDebug() << "x11 preferred pixel format: " << d.pixfmt;
         setPreferredPixelFormat(d.pixfmt);
+    }
+
+    QRect roi = realROI();
+    XImage* ximage = d.ximage_pool[d.current_index];
+    uchar* img_data = use_shm ? (quint8*)ximage->data : (quint8*)ximage_data[d.current_index].constData();
+    d.current_index = (d.current_index+1)%kPoolSize;
+
+    VideoFrame ppframe(ximage->width, ximage->height, pixelFormat(ximage));
+    ppframe.setBits(img_data, 0);
+    ppframe.setBytesPerLine(ximage->bytes_per_line, 0);
+    ppframe.setTimestamp(d.frame_orig.timestamp());
+    foreach(Filter* filter, d.filters) {
+        VideoFilter *vf = static_cast<VideoFilter*>(filter);
+        if (!vf) {
+            qWarning("a null filter!");
+            //d.filters.removeOne(filter);
+            continue;
+        }
+        if (!vf->isEnabled())
+            continue;
+        if (!vf->context())
+            continue;
+        //vf->prepareContext(d.filter_context, d.statistics, 0);
+        if (vf->prepareContext(NULL, d.statistics, 0)) // must be None context
+            vf->apply(d.statistics, &ppframe); //painter and paint device are ready, pass video frame is ok.
     }
 
     if (d.use_shm) {
@@ -470,8 +496,6 @@ void X11Renderer::drawFrame()
             usleep(1000);
         }
     }
-    QRect roi = realROI();
-    XImage* ximage = d.ximage_pool[d.current_index];
     if (d.use_shm) {
         XShmPutImage(d.display, winId(), d.gc, ximage
                       , roi.x(), roi.y()//, roi.width(), roi.height()
@@ -484,7 +508,6 @@ void X11Renderer::drawFrame()
                    , d.out_rect.x(), d.out_rect.y(), d.out_rect.width(), d.out_rect.height());
         XSync(d.display, False); // update immediately
     }
-    d.current_index = (d.current_index+1)%kPoolSize;
 }
 
 void X11Renderer::paintEvent(QPaintEvent *)

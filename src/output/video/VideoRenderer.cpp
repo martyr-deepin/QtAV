@@ -252,6 +252,8 @@ void VideoRenderer::resizeRenderer(int width, int height)
         return;
     d.renderer_width = width;
     d.renderer_height = height;
+    if (d.out_aspect_ratio_mode == RendererAspectRatio)
+        Q_EMIT outAspectRatioChanged();
     if (d.computeOutParameters(d.out_aspect_ratio)) {
         Q_EMIT videoRectChanged();
         Q_EMIT contentRectChanged();
@@ -489,7 +491,7 @@ void VideoRenderer::handlePaintEvent()
                     continue;
                 // qpainter on video frame always runs on video thread. qpainter on renderer's paint device can work on rendering thread
                 // Here apply filters on frame on video thread, for example, GPU filters
-                if (!vf->context() || vf->context()->type() != VideoFilterContext::OpenGL)
+                if (!vf->context() || (vf->context()->painter && vf->context()->type() != VideoFilterContext::OpenGL))
                     continue;
                 //vf->prepareContext(d.filter_context, d.statistics, 0);
                 vf->apply(d.statistics, &d.video_frame); //painter and paint device are ready, pass video frame is ok.
@@ -531,6 +533,8 @@ void VideoRenderer::handlePaintEvent()
                 continue;
             }
             if (vf->prepareContext(d.filter_context, d.statistics, 0)) {
+                if (!vf->isSupported(d.filter_context->type()))
+                    continue;
                 vf->apply(d.statistics, &d.video_frame); //painter and paint device are ready, pass video frame is ok.
             }
         }

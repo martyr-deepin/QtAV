@@ -162,6 +162,7 @@ public:
       * \return empty image if no image, or subtitle processor does not support renderering
       */
     QImage getImage(int width, int height, QRect* boundingRect = 0);
+    bool drawImage(QPaintDevice* pd, QRect* boundingRect = 0);
     // used for embedded subtitles.
     /*!
      * \brief processHeader

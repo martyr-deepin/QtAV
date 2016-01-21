@@ -259,6 +259,7 @@ void Subtitle::setFileName(const QString &name)
 {
     if (priv->file_name == name)
         return;
+    priv->loaded = false;
     priv->url.clear();
     priv->raw_data.clear();
     priv->file_name = name;
@@ -529,6 +530,28 @@ QImage Subtitle::getImage(int width, int height, QRect* boundingRect)
     // TODO: store bounding rect here and not in processor
     priv->current_image = priv->processor->getImage(priv->t - priv->delay, boundingRect);
     return priv->current_image;
+}
+
+bool Subtitle::drawImage(QPaintDevice *pd, QRect *boundingRect)
+{
+    QMutexLocker lock(&priv->mutex);
+    Q_UNUSED(lock);
+    if (!isLoaded())
+        return false;
+    if (!pd)
+        return false;
+#if 0
+    if (!priv->current_count) //seems ok to use this code
+        return QImage();
+    // always render the image to support animations
+    if (!priv->update_image
+            && width == priv->current_image.width() && height == priv->current_image.height())
+        return priv->current_image;
+#endif
+    priv->update_image = false;
+    priv->processor->setFrameSize(pd->width(), pd->height());
+    // TODO: store bounding rect here and not in processor
+    return priv->processor->drawImage(priv->t - priv->delay, pd, boundingRect);
 }
 
 bool Subtitle::processHeader(const QByteArray& codec, const QByteArray &data)

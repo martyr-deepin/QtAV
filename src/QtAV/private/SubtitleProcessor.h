@@ -75,6 +75,12 @@ public:
     virtual QString getText(qreal pts) const = 0;
     // default null image
     virtual QImage getImage(qreal pts, QRect* boundingRect = 0);
+    virtual bool drawImage(qreal pts, QPaintDevice* pd, QRect* boundingRect = 0) {
+        Q_UNUSED(pts)
+        Q_UNUSED(pd)
+        Q_UNUSED(boundingRect);
+        return false;
+    }
     void setFrameSize(int width, int height);
     QSize frameSize() const;
 

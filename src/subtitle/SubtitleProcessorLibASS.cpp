@@ -26,6 +26,7 @@
 #include <QtCore/QFile>
 #include <QtCore/QMutex>
 #include <QtCore/QThread>
+#include <QtGui/QPaintEngine>
 #include "QtAV/Packet.h"
 #include "QtAV/private/factory.h"
 #include "PlainText.h"
@@ -56,6 +57,7 @@ public:
     bool canRender() const Q_DECL_OVERRIDE { return true;}
     QString getText(qreal pts) const Q_DECL_OVERRIDE;
     QImage getImage(qreal pts, QRect *boundingRect = 0) Q_DECL_OVERRIDE;
+    bool drawImage(qreal pts, QPaintDevice* pd, QRect* boundingRect = 0) Q_DECL_OVERRIDE;
     bool processHeader(const QByteArray& codec, const QByteArray& data) Q_DECL_OVERRIDE;
     SubtitleFrame processLine(const QByteArray& data, qreal pts = -1, qreal duration = 0) Q_DECL_OVERRIDE;
     void setFontFile(const QString& file) Q_DECL_OVERRIDE;
@@ -64,6 +66,7 @@ public:
 protected:
     void onFrameSizeChanged(int width, int height) Q_DECL_OVERRIDE;
 private:
+    QString getTextInternal(qreal pts) const;
     bool initRenderer();
     void updateFontCacheAsync();
     // render 1 ass image into a 32bit QImage with alpha channel.
@@ -246,6 +249,11 @@ bool SubtitleProcessorLibASS::processHeader(const QByteArray& codec, const QByte
         return false;
     }
     ass_process_codec_private(m_track, (char*)data.constData(), data.size());
+    if (resolve("ass_set_check_readorder")) {
+#if !defined(CAPI_LINK_ASS) || (LIBASS_VERSION >= 0x01302000)
+        ass_set_check_readorder(m_track, 1);
+#endif
+    }
     return true;
 }
 
@@ -264,8 +272,11 @@ SubtitleFrame SubtitleProcessorLibASS::processLine(const QByteArray &data, qreal
     if (m_codec == QByteArrayLiteral("ass")) {
         ass_process_chunk(m_track, (char*)data.constData(), data.size(), pts*1000.0, duration*1000.0);
     } else { //ssa
-        //ssa. mpv: flush_on_seek, broken ffmpeg ASS packet format
-        ass_process_data(m_track, (char*)data.constData(), data.size());
+        // ! clear on seek
+        if (getTextInternal(pts).isEmpty()) {
+            //ssa. mpv: flush_on_seek, broken ffmpeg ASS packet format
+            ass_process_data(m_track, (char*)data.constData(), data.size());
+        }
     }
     if (nb_tracks == m_track->n_events)
         return SubtitleFrame();
@@ -289,6 +300,11 @@ QString SubtitleProcessorLibASS::getText(qreal pts) const
 {
     QMutexLocker lock(&m_mutex);
     Q_UNUSED(lock);
+    return getTextInternal(pts);
+}
+
+QString SubtitleProcessorLibASS::getTextInternal(qreal pts) const
+{
     QString text;
     for (int i = 0; i < m_frames.size(); ++i) {
         if (m_frames[i].begin <= pts && m_frames[i].end >= pts) {
@@ -359,6 +375,61 @@ QImage SubtitleProcessorLibASS::getImage(qreal pts, QRect *boundingRect)
     }
     m_image = image;
     return image;
+}
+
+bool SubtitleProcessorLibASS::drawImage(qreal pts, QPaintDevice *pd, QRect *boundingRect)
+{
+    //if (pd->paintEngine()->type() != QPaintEngine:)
+    QImage *qimg = static_cast<QImage*>(pd);
+    if (!qimg)
+        return false;
+    if (qimg->format() != QImage::Format_ARGB32) {
+        qWarning("only supports argb32 qimage");
+        return false;
+    }
+    // ass dll is loaded if ass library is available
+    {
+    QMutexLocker lock(&m_mutex);
+    Q_UNUSED(lock);
+    if (!m_ass) {
+        qWarning("ass library not available");
+        return false;
+    }
+    if (!m_track) {
+        qWarning("ass track not available");
+        return false;
+    }
+    if (!m_renderer) {
+        initRenderer();
+        if (!m_renderer) {
+            qWarning("ass renderer not available");
+            return false;
+        }
+    }
+    }
+    if (m_update_cache)
+        updateFontCache();
+
+    QMutexLocker lock(&m_mutex);
+    Q_UNUSED(lock);
+    if (!m_renderer) //reset in setFontXXX
+        return false;
+    int detect_change = 0;
+    ASS_Image *img = ass_render_frame(m_renderer, m_track, (long long)(pts * 1000.0), &detect_change);
+    if (detect_change) {
+        QRect rect(0, 0, 0, 0);
+        for (ASS_Image *i = img; i; i = i->next)
+            rect |= QRect(i->dst_x, i->dst_y, i->w, i->h);
+        m_bound = rect;
+    }
+    if (boundingRect)
+        *boundingRect = m_bound;
+    for (ASS_Image *i = img; i; i = i->next) {
+        if (i->w <= 0 || i->h <= 0)
+            continue;
+        renderASS32(qimg, i, i->dst_x, i->dst_y);
+    }
+    return true;
 }
 
 void SubtitleProcessorLibASS::onFrameSizeChanged(int width, int height)
