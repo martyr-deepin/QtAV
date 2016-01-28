@@ -294,7 +294,6 @@ void dma_copy_to_vmem(unsigned int dst, unsigned char* src, int len)
 void dma_copy_from_vmem(unsigned char* dst, unsigned int src, int len)
 {
         struct dma_info *dma_info;
-        memset(dst, 0, len);
         dma_info = malloc(sizeof(struct dma_info));
 //      printf("malloc dma_info: %p\n", dma_info);
         dma_info->vsrc          = (unsigned long)src;
